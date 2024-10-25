@@ -16,6 +16,8 @@ from rest_framework import viewsets, permissions
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
+from django.db.models import Q
+from datetime import datetime
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 5
@@ -146,24 +148,40 @@ class PostViewSet(viewsets.ModelViewSet):
         queryset = Post.objects.all()
         category = self.request.query_params.get('category', None)
         author = self.request.query_params.get('author', None)
-        date = self.request.query_params.get('date', None)
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
         search = self.request.query_params.get('search', None)
 
         if category:
             queryset = queryset.filter(category__name=category)
         if author:
             queryset = queryset.filter(author__username=author)
-        if date:
-            queryset = queryset.filter(date=date)
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                queryset = queryset.filter(date__date__range=[start, end])
+            except ValueError:
+                pass  # 날짜 형식이 잘못된 경우 무시
         if search:
-            queryset = queryset.filter(title__icontains=search) | queryset.filter(content__icontains=search)
-        print(queryset)
+            queryset = queryset.filter(
+                Q(title__icontains=search) | Q(content__icontains=search)
+            )
         return queryset
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['post']
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    def get_queryset(self):
+        queryset = Comment.objects.filter(parent=None)  # 최상위 댓글만 가져옵니다
+        post = self.request.query_params.get('post', None)
+        if post is not None:
+            queryset = queryset.filter(post__id=post)
+        return queryset
