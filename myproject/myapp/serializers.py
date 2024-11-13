@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Category, Post, Comment
+from .models import CustomUser, Category, Post, Comment, Information
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 class UserSerializer(serializers.ModelSerializer):
@@ -56,3 +56,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
+
+class InformationSerializer(serializers.ModelSerializer):
+    author_username = serializers.ReadOnlyField(source='author.username')
+    
+    class Meta:
+        model = Information
+        fields = ['id', 'title', 'content', 'author', 'author_username', 
+                 'created_at', 'updated_at', 'views']
+        read_only_fields = ['author', 'created_at', 'updated_at', 'views']

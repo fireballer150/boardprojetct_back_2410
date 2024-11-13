@@ -8,8 +8,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 from django.contrib.auth import authenticate, login, logout
-from .serializers import UserSerializer, UserUpdateSerializer, LoginSerializer, CustomTokenObtainPairSerializer,CategorySerializer,PostSerializer,CommentSerializer
-from .models import CustomUser, Category, Post, Comment
+from .serializers import UserSerializer, UserUpdateSerializer, LoginSerializer, CustomTokenObtainPairSerializer,CategorySerializer,PostSerializer,CommentSerializer,InformationSerializer
+from .models import CustomUser, Category, Post, Comment, Information
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework import viewsets, permissions
@@ -18,7 +18,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 from django.db.models import Q
 from datetime import datetime
-
+from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
+from django.db import connections
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 5
     page_size_query_param = 'page_size'
@@ -185,3 +187,82 @@ class CommentViewSet(viewsets.ModelViewSet):
         if post is not None:
             queryset = queryset.filter(post__id=post)
         return queryset
+
+class InformationViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    
+    # 목록 조회
+    def list(self, request):
+        queryset = Information.objects.all()
+        page = self.paginate_queryset(queryset)
+        serializer = InformationSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+    
+    # 상세 조회
+    def retrieve(self, request, pk=None):
+        information = get_object_or_404(Information, pk=pk)
+        information.views += 1
+        information.save()
+        serializer = InformationSerializer(information)
+        return Response(serializer.data)
+    
+    # 생성
+    def create(self, request):
+        serializer = InformationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(author=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 수정
+    def update(self, request, pk=None):
+        information = get_object_or_404(Information, pk=pk)
+        if information.author != request.user:
+            return Response({"error": "권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = InformationSerializer(information, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 부분 수정
+    def partial_update(self, request, pk=None):
+        information = get_object_or_404(Information, pk=pk)
+        if information.author != request.user:
+            return Response({"error": "권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = InformationSerializer(information, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 삭제
+    def destroy(self, request, pk=None):
+        information = get_object_or_404(Information, pk=pk)
+        if information.author != request.user:
+            return Response({"error": "권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+        
+        information.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class NsaResourceView(APIView):
+    # connection = pymysql.connect(host='localhost', user='root', password='7F5c2c3c4@!#', db='kkotest', charset='utf8')
+    
+    
+    def my_custom_sql_function(self):
+        connection = connections['default']
+        sql = "SELECT * FROM post"
+        params = ['post']  # SQL 인젝션 방지를 위해 파라메터 사용
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql)
+            results = cursor.fetchall()
+        print(f'results: {results}')        
+        return results
+# connection = connctions['default']
+    def get(self, request):
+        self.my_custom_sql_function()
+        return Response({'message': 'Hello, World!'}, status=status.HTTP_200_OK)

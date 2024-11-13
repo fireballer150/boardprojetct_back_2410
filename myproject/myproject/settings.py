@@ -87,7 +87,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'kkotest',  # 데이터베이스 이름
         'USER': 'root',       # 데이터베이스 사용자 이름
-        'PASSWORD': 'root1234',   # 데이터베이스 비밀번호
+        'PASSWORD': '7F5c2c3c4@!#',   # 데이터베이스 비밀번호
         'HOST': 'localhost',           # 로컬 호스트
         'PORT': '3306',                # MySQL 기본 포트
     }
